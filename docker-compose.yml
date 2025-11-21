@@ -1,0 +1,19 @@
+version: '3.9'
+services:
+  web:
+    image: nginx:latest
+    container_name: static-website
+    ports:
+      - "8083:80"
+  apache:
+    image: httpd:alpine
+    container_name: apache-image
+    ports:
+      - "8082:80"
+  my-image:
+    image: my-image:latest
+    container_name: my-image
+    ports:
+      - "8081:80"
+    volumes:
+      - ./My-Portfolio:/usr/share/nginx/html:ro
