@@ -1,3 +1,6 @@
+# Terraform Configuration for VPC and EC2 Deployment
+# Pipeline trigger - ready for deployment
+
 # Create VPC
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
