@@ -145,3 +145,4 @@ git push origin main
 
 - `.github/workflows/terraform-deploy.yml` - GitHub Actions pipeline configuration
 - Existing Terraform files: `main.tf`, `variables.tf`, `outputs.tf`, `provider.tf`
+# Pipeline test - ready to deploy
