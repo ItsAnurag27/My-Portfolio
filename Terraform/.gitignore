@@ -1,9 +1,9 @@
 # Local .terraform directories
 **/.terraform/*
 
-# .tfstate files
-*.tfstate
-*.tfstate.*
+# .tfstate files - ALLOW these to be committed for pipeline state tracking
+# *.tfstate
+# *.tfstate.*
 
 # Crash log files
 crash.log
@@ -38,3 +38,4 @@ tfplan.destroy
 .idea/
 *.swp
 *.swo
+

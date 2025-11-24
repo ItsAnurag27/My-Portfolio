@@ -88,6 +88,17 @@ jobs:
           terraform apply -auto-approve tfplan
         continue-on-error: true
 
+      - name: Commit Terraform State
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.terraform.result == 'success'
+        run: |
+          cd Terraform
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add terraform.tfstate terraform.tfstate.backup
+          git commit -m "Update Terraform state after apply [skip ci]" || echo "No state changes to commit"
+          git push
+        continue-on-error: true
+
       - name: Terraform Output
         if: github.ref == 'refs/heads/main' && github.event_name == 'push'
         id: output
