@@ -1,0 +1,27 @@
+# Terraform Variables File - EXAMPLE
+# Copy this to terraform.tfvars and update with your actual values
+# Note: terraform.tfvars is in .gitignore to keep secrets safe
+
+# AWS region for resource deployment
+aws_region = "us-east-1"
+
+# VPC CIDR block
+vpc_cidr = "10.0.0.0/16"
+
+# Public subnet CIDR block
+public_subnet_cidr = "10.0.1.0/24"
+
+# EC2 instance type
+instance_type = "t2.micro"
+
+# Name tag for the EC2 instance
+instance_name = "my-ec2-instance"
+
+# Key pair name - MUST already exist in AWS account
+# Create one in AWS EC2 Console if it doesn't exist
+key_name = "aws-project-example"
+
+# AMI ID for Amazon Linux 2 in us-east-1
+# This is free tier eligible and widely supported
+# For other regions, find the appropriate AMI ID in AWS Console or using AWS CLI
+instance_ami = "ami-0fa3fe0fa7920f68e"
