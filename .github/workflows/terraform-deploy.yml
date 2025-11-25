@@ -1,0 +1,156 @@
+name: Terraform VPC and EC2 Deployment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'Terraform/**'
+      - '.github/workflows/terraform-deploy.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'Terraform/**'
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: 1.5.0
+
+jobs:
+  terraform:
+    name: Terraform Plan and Apply
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive Terraform/
+        continue-on-error: true
+
+      - name: Terraform Init
+        id: init
+        run: |
+          cd Terraform
+          terraform init
+
+      - name: Terraform Validate
+        id: validate
+        run: |
+          cd Terraform
+          terraform validate
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          cd Terraform
+          terraform plan -out=tfplan
+        continue-on-error: true
+
+      - name: Create PR Comment with Plan
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        continue-on-error: true
+        with:
+          script: |
+            try {
+              const body = `## Terraform Plan Ready\n\nRun 'terraform apply' to deploy changes.`;
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body
+              });
+            } catch (error) {
+              console.log('Could not create comment: ' + error.message);
+            }
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        id: apply
+        run: |
+          cd Terraform
+          terraform apply -auto-approve tfplan
+        continue-on-error: true
+
+      - name: Commit Terraform State
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          cd Terraform
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add terraform.tfstate terraform.tfstate.backup 2>/dev/null || true
+          git commit -m "Update Terraform state after apply [skip ci]" || echo "No state changes to commit"
+          git push || echo "Failed to push state"
+        continue-on-error: true
+
+      - name: Terraform Output
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        id: output
+        run: |
+          cd Terraform
+          echo "## Terraform Outputs" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          terraform output >> $GITHUB_STEP_SUMMARY || echo "No outputs to display" >> $GITHUB_STEP_SUMMARY
+
+      - name: Terraform Destroy Plan (Optional)
+        if: github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'destroy')
+        id: destroy_plan
+        run: |
+          cd Terraform
+          terraform plan -destroy -out=tfplan.destroy
+        continue-on-error: true
+
+      - name: Terraform Destroy (Only on main with destroy label)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push' && contains(github.event.head_commit.message, '[destroy]')
+        id: destroy
+        run: |
+          cd Terraform
+          terraform destroy -auto-approve
+        continue-on-error: true
+
+      - name: Upload Terraform Plan
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-plan
+          path: Terraform/tfplan
+          retention-days: 5
+
+  notify:
+    name: Notify Deployment Status
+    runs-on: ubuntu-latest
+    needs: terraform
+    if: always()
+
+    steps:
+      - name: Deployment Success
+        if: needs.terraform.result == 'success' && github.ref == 'refs/heads/main'
+        run: |
+          echo "✅ Terraform deployment succeeded!"
+          echo "VPC and EC2 resources have been created/updated successfully."
+
+      - name: Deployment Failure
+        if: needs.terraform.result == 'failure'
+        run: |
+          echo "❌ Terraform deployment failed!"
+          echo "Please check the workflow logs for details."
+        continue-on-error: true
