@@ -26,7 +26,7 @@ variable "instance_name" {
 variable "key_name" {
   description = "Existing key pair name in AWS"
   type        = string
-  default = "aws-project-example"
+  default = "my-portfolio-key-2"
 }
 
 variable "vpc_cidr" {
