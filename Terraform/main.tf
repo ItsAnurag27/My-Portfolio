@@ -90,6 +90,40 @@ resource "aws_instance" "ec-2" {
 
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
 
+  # User data script to install Docker and deploy container
+  user_data = base64encode(<<-EOF
+              #!/bin/bash
+              set -e
+              
+              echo "Updating system packages..."
+              yum update -y
+              
+              echo "Installing Docker..."
+              yum install -y docker git
+              
+              echo "Starting Docker service..."
+              systemctl start docker
+              systemctl enable docker
+              
+              echo "Adding ec2-user to docker group..."
+              usermod -a -G docker ec2-user
+              
+              echo "Cloning repository..."
+              cd /tmp
+              git clone https://github.com/ItsAnurag27/My-Portfolio.git
+              cd My-Portfolio
+              
+              echo "Building Docker image..."
+              docker build -t my-portfolio:latest .
+              
+              echo "Running Docker container..."
+              docker run -d --name my-portfolio-app -p 80:80 my-portfolio:latest
+              
+              echo "Docker container started successfully!"
+              docker ps
+              EOF
+  )
+
   tags = {
     Name = var.instance_name
   }
