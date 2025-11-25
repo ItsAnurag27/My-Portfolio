@@ -93,8 +93,11 @@ resource "aws_instance" "ec-2" {
   # User data script to install Docker and deploy container
   user_data = base64encode(<<-EOF
               #!/bin/bash
-              set -e
+              set -x
+              exec > >(tee /var/log/user-data.log)
+              exec 2>&1
               
+              echo "=== Starting user data script ==="
               echo "Updating system packages..."
               yum update -y
               
@@ -105,11 +108,11 @@ resource "aws_instance" "ec-2" {
               systemctl start docker
               systemctl enable docker
               
-              echo "Adding ec2-user to docker group..."
-              usermod -a -G docker ec2-user
+              echo "Waiting for Docker to be ready..."
+              sleep 5
               
               echo "Cloning repository..."
-              cd /tmp
+              cd /home/ec2-user
               git clone https://github.com/ItsAnurag27/My-Portfolio.git
               cd My-Portfolio
               
@@ -119,8 +122,9 @@ resource "aws_instance" "ec-2" {
               echo "Running Docker container..."
               docker run -d --name my-portfolio-app -p 80:80 my-portfolio:latest
               
-              echo "Docker container started successfully!"
+              echo "Verifying container..."
               docker ps
+              echo "=== User data script completed ==="
               EOF
   )
 
