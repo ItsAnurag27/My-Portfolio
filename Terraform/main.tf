@@ -190,18 +190,47 @@ resource "aws_instance" "ec-2" {
               echo "Creating update script..."
               cat > /home/ec2-user/update-portfolio.sh << 'SCRIPT'
               #!/bin/bash
+              set -x
+              exec >> /var/log/portfolio-updates.log 2>&1
+              
+              echo "=== Portfolio Update Check at $(date) ==="
+              
               cd /home/ec2-user/My-Portfolio
-              git pull origin main
-              docker build -t my-portfolio:latest .
-              docker stop my-portfolio-app || true
-              docker rm my-portfolio-app || true
-              docker run -d --name my-portfolio-app -p 80:80 my-portfolio:latest
+              
+              # Fetch latest code
+              echo "Fetching latest code..."
+              git fetch origin main
+              
+              # Check if there are new commits
+              LOCAL=$(git rev-parse HEAD)
+              REMOTE=$(git rev-parse origin/main)
+              
+              if [ "$LOCAL" != "$REMOTE" ]; then
+                echo "New commits found! Updating..."
+                git pull origin main
+                
+                echo "Rebuilding Docker image..."
+                docker build -t my-portfolio:latest .
+                
+                echo "Stopping old container..."
+                docker stop my-portfolio-app || true
+                docker rm my-portfolio-app || true
+                
+                echo "Starting new container..."
+                docker run -d --name my-portfolio-app -p 80:80 my-portfolio:latest
+                
+                echo "Container restarted successfully!"
+              else
+                echo "No new updates available."
+              fi
+              
+              echo "=== Update check complete ==="
               SCRIPT
               
               chmod +x /home/ec2-user/update-portfolio.sh
               
-              echo "Setting up cron job to check for updates every 5 minutes..."
-              echo "*/5 * * * * /home/ec2-user/update-portfolio.sh >> /var/log/portfolio-updates.log 2>&1" | crontab -
+              echo "Setting up cron job to check for updates every 2 minutes..."
+              echo "*/2 * * * * /home/ec2-user/update-portfolio.sh" | crontab -
               
               systemctl start crond
               systemctl enable crond
