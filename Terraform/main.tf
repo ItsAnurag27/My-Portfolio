@@ -121,6 +121,25 @@ resource "aws_instance" "ec-2" {
               echo "Running Docker container..."
               docker run -d --name my-portfolio-app -p 80:80 my-portfolio:latest
               
+              echo "Creating update script..."
+              cat > /home/ec2-user/update-portfolio.sh << 'SCRIPT'
+              #!/bin/bash
+              cd /home/ec2-user/My-Portfolio
+              git pull origin main
+              docker build -t my-portfolio:latest .
+              docker stop my-portfolio-app || true
+              docker rm my-portfolio-app || true
+              docker run -d --name my-portfolio-app -p 80:80 my-portfolio:latest
+              SCRIPT
+              
+              chmod +x /home/ec2-user/update-portfolio.sh
+              
+              echo "Setting up cron job to check for updates every 5 minutes..."
+              echo "*/5 * * * * /home/ec2-user/update-portfolio.sh >> /var/log/portfolio-updates.log 2>&1" | crontab -
+              
+              systemctl start crond
+              systemctl enable crond
+              
               echo "Verifying container..."
               docker ps
               echo "=== User data script completed ==="
@@ -134,25 +153,5 @@ resource "aws_instance" "ec-2" {
   # Prevent Terraform from destroying and recreating the instance
   lifecycle {
     ignore_changes = [ami, user_data]
-  }
-
-  # Provisioner to update Docker container with latest code
-  provisioner "remote-exec" {
-    inline = [
-      "cd /home/ec2-user/My-Portfolio",
-      "git pull origin main",
-      "docker build -t my-portfolio:latest .",
-      "docker stop my-portfolio-app || true",
-      "docker rm my-portfolio-app || true",
-      "docker run -d --name my-portfolio-app -p 80:80 my-portfolio:latest"
-    ]
-
-    connection {
-      type        = "ssh"
-      user        = "ec2-user"
-      private_key = file("~/.ssh/${var.key_name}.pem")
-      host        = self.public_ip
-      timeout     = "5m"
-    }
   }
 }
