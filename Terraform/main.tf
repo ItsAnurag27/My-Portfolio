@@ -231,7 +231,6 @@ resource "aws_instance" "ec-2" {
       vpc_security_group_ids,
       root_block_device,
       ebs_block_device,
-      credit_specification,
       associate_public_ip_address,
       ipv6_address_count,
       ipv6_addresses,
@@ -239,10 +238,6 @@ resource "aws_instance" "ec-2" {
       source_dest_check,
       tags,
       tenancy,
-      cpu_options,
-      cpu_core_count,
-      cpu_threads_per_core,
-      hibernation_options,
       monitoring
     ]
   }
