@@ -130,4 +130,29 @@ resource "aws_instance" "ec-2" {
   tags = {
     Name = var.instance_name
   }
+
+  # Prevent Terraform from destroying and recreating the instance
+  lifecycle {
+    ignore_changes = [ami, user_data]
+  }
+
+  # Provisioner to update Docker container with latest code
+  provisioner "remote-exec" {
+    inline = [
+      "cd /home/ec2-user/My-Portfolio",
+      "git pull origin main",
+      "docker build -t my-portfolio:latest .",
+      "docker stop my-portfolio-app || true",
+      "docker rm my-portfolio-app || true",
+      "docker run -d --name my-portfolio-app -p 80:80 my-portfolio:latest"
+    ]
+
+    connection {
+      type        = "ssh"
+      user        = "ec2-user"
+      private_key = file("~/.ssh/${var.key_name}.pem")
+      host        = self.public_ip
+      timeout     = "5m"
+    }
+  }
 }
