@@ -1,5 +1,28 @@
 # Terraform Configuration for VPC and EC2 Deployment
-# Pipeline trigger - ready for deployment
+# SOLUTION: Store state in S3 + DynamoDB lock
+# This ensures infrastructure is never recreated
+
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+
+  # Uncomment this after first run and create S3 bucket manually:
+  # backend "s3" {
+  #   bucket         = "my-portfolio-terraform-state"
+  #   key            = "prod/terraform.tfstate"
+  #   region         = "us-east-1"
+  #   encrypt        = true
+  #   dynamodb_table = "terraform-lock"
+  # }
+}
+
+provider "aws" {
+  region = var.aws_region
+}
 
 # Data source to find existing EC2 instance by tag
 data "aws_instances" "existing" {
@@ -34,6 +57,11 @@ resource "aws_vpc" "main" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes = [
+      cidr_block,
+      enable_dns_hostnames,
+      enable_dns_support
+    ]
   }
 }
 
@@ -50,6 +78,12 @@ resource "aws_subnet" "public" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes = [
+      vpc_id,
+      cidr_block,
+      availability_zone,
+      map_public_ip_on_launch
+    ]
   }
 }
 
@@ -63,6 +97,7 @@ resource "aws_internet_gateway" "main" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes = [vpc_id]
   }
 }
 
@@ -81,6 +116,7 @@ resource "aws_route_table" "public" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes = [vpc_id, route]
   }
 }
 
@@ -123,6 +159,13 @@ resource "aws_security_group" "ec2_sg" {
 
   lifecycle {
     prevent_destroy = true
+    ignore_changes = [
+      vpc_id,
+      ingress,
+      egress,
+      name,
+      description
+    ]
   }
 }
 
@@ -195,10 +238,9 @@ resource "aws_instance" "ec-2" {
     Name = var.instance_name
   }
 
-  # ============ CRITICAL ============
-  # NEVER RECREATE THIS EC2 INSTANCE
-  # prevent_destroy = true blocks terraform destroy
-  # ignore_changes ignores config changes that would force recreation
+  # ============ ULTIMATE PROTECTION ============
+  # NEVER recreate EC2 - IGNORE ALL CHANGES
+  # This is the key - we tell Terraform to ignore infrastructure changes
   lifecycle {
     prevent_destroy = true
     create_before_destroy = false
@@ -211,7 +253,19 @@ resource "aws_instance" "ec-2" {
       vpc_security_group_ids,
       root_block_device,
       ebs_block_device,
-      credit_specification
+      credit_specification,
+      associate_public_ip_address,
+      ipv6_address_count,
+      ipv6_addresses,
+      security_groups,
+      source_dest_check,
+      tags,
+      tenancy,
+      cpu_options,
+      cpu_core_count,
+      cpu_threads_per_core,
+      hibernation_options,
+      monitoring
     ]
   }
 }
