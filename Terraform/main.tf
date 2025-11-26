@@ -1,6 +1,27 @@
 # Terraform Configuration for VPC and EC2 Deployment
 # Pipeline trigger - ready for deployment
 
+# Data source to find existing EC2 instance by tag
+data "aws_instances" "existing" {
+  filter {
+    name   = "tag:Name"
+    values = [var.instance_name]
+  }
+
+  filter {
+    name   = "instance-state-name"
+    values = ["running", "stopped"]
+  }
+
+  depends_on = [aws_vpc.main]
+}
+
+# Check if EC2 instance already exists
+locals {
+  instance_exists = length(data.aws_instances.existing.ids) > 0
+  existing_instance_id = length(data.aws_instances.existing.ids) > 0 ? data.aws_instances.existing.ids[0] : null
+}
+
 # Create VPC aws
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
@@ -151,7 +172,9 @@ resource "aws_instance" "ec-2" {
   }
 
   # Prevent Terraform from destroying and recreating the instance
+  # This is the key setting - it will NEVER destroy and recreate
   lifecycle {
-    ignore_changes = [ami, user_data]
+    ignore_changes = [ami, user_data, instance_type, key_name]
+    prevent_destroy = true
   }
 }
