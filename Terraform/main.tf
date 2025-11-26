@@ -31,6 +31,10 @@ resource "aws_vpc" "main" {
   tags = {
     Name = "main-vpc"
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Create public subnet
@@ -43,6 +47,10 @@ resource "aws_subnet" "public" {
   tags = {
     Name = "public-subnet"
   }
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Create internet gateway
@@ -51,6 +59,10 @@ resource "aws_internet_gateway" "main" {
 
   tags = {
     Name = "main-igw"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -65,6 +77,10 @@ resource "aws_route_table" "public" {
 
   tags = {
     Name = "public-rt"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -99,6 +115,14 @@ resource "aws_security_group" "ec2_sg" {
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "ec2-ssh-http-sg"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
@@ -171,10 +195,23 @@ resource "aws_instance" "ec-2" {
     Name = var.instance_name
   }
 
-  # Prevent Terraform from destroying and recreating the instance
-  # This is the key setting - it will NEVER destroy and recreate
+  # ============ CRITICAL ============
+  # NEVER RECREATE THIS EC2 INSTANCE
+  # prevent_destroy = true blocks terraform destroy
+  # ignore_changes ignores config changes that would force recreation
   lifecycle {
-    ignore_changes = [ami, user_data, instance_type, key_name]
     prevent_destroy = true
+    create_before_destroy = false
+    ignore_changes = [
+      ami,
+      user_data,
+      instance_type,
+      key_name,
+      subnet_id,
+      vpc_security_group_ids,
+      root_block_device,
+      ebs_block_device,
+      credit_specification
+    ]
   }
 }
