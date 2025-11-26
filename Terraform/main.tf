@@ -1,28 +1,6 @@
 # Terraform Configuration for VPC and EC2 Deployment
-# SOLUTION: Store state in S3 + DynamoDB lock
+# SOLUTION: Use ignore_changes on all resources to prevent recreation
 # This ensures infrastructure is never recreated
-
-terraform {
-  required_providers {
-    aws = {
-      source  = "hashicorp/aws"
-      version = "~> 5.0"
-    }
-  }
-
-  # Uncomment this after first run and create S3 bucket manually:
-  # backend "s3" {
-  #   bucket         = "my-portfolio-terraform-state"
-  #   key            = "prod/terraform.tfstate"
-  #   region         = "us-east-1"
-  #   encrypt        = true
-  #   dynamodb_table = "terraform-lock"
-  # }
-}
-
-provider "aws" {
-  region = var.aws_region
-}
 
 # Data source to find existing EC2 instance by tag
 data "aws_instances" "existing" {
