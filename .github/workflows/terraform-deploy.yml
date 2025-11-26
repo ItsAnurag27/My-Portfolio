@@ -4,14 +4,9 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'Terraform/**'
-      - '.github/workflows/terraform-deploy.yml'
   pull_request:
     branches:
       - main
-    paths:
-      - 'Terraform/**'
 
 env:
   AWS_REGION: us-east-1
