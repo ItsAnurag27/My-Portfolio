@@ -23,6 +23,9 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          # Debug: verify key format
+          head -1 ~/.ssh/deploy_key
+          tail -1 ~/.ssh/deploy_key
 
       - name: Build and Push Docker Image to EC2
         run: |
