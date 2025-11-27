@@ -1,12 +1,7 @@
 name: Infrastructure Setup (VPC & EC2) - Runs Once
 
 on:
-  workflow_dispatch:  # Manual trigger only - runs ONLY when you click "Run Workflow"
-  push:
-    branches:
-      - main
-    paths:
-      - 'Terraform/**'  # Only triggers if Terraform files change
+  workflow_dispatch:  # Manual trigger ONLY - runs only when you click "Run Workflow"
 
 env:
   AWS_REGION: us-east-1
