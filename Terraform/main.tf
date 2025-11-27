@@ -170,8 +170,7 @@ resource "aws_instance" "ec-2" {
 
   vpc_security_group_ids = [aws_security_group.ec2_sg.id]
 
-  # Minimal user data:
-  # Just install Docker so GitHub Actions can deploy using SSH + docker pull
+  # User data script: install Docker, clone repo, build and run container
   user_data = <<-EOF
               #!/bin/bash
               set -x
@@ -182,11 +181,57 @@ resource "aws_instance" "ec-2" {
               yum update -y
 
               echo "Installing Docker..."
-              yum install -y docker
+              yum install -y docker git
 
               echo "Enabling and starting Docker..."
               systemctl enable docker
               systemctl start docker
+
+              echo "Cloning GitHub repository..."
+              cd /home/ec2-user
+              git clone https://github.com/ItsAnurag27/My-Portfolio.git
+              cd My-Portfolio
+
+              echo "Building Docker image..."
+              docker build -t my-portfolio:latest .
+
+              echo "Running Docker container..."
+              docker run -d --name my-portfolio-app -p 80:80 my-portfolio:latest
+
+              echo "Setting up auto-update script..."
+              cat > /home/ec2-user/update-portfolio.sh << 'EOSCRIPT'
+#!/bin/bash
+set -x
+exec >> /var/log/portfolio-updates.log 2>&1
+
+echo "=== Portfolio Update Check at $(date) ==="
+
+cd /home/ec2-user/My-Portfolio
+
+# Fetch latest code
+git fetch origin main
+
+# Check if there are new commits
+LOCAL=$(git rev-parse HEAD)
+REMOTE=$(git rev-parse origin/main)
+
+if [ "$LOCAL" != "$REMOTE" ]; then
+  echo "New commits found! Updating..."
+  git pull origin main
+  docker build -t my-portfolio:latest .
+  docker stop my-portfolio-app || true
+  docker rm my-portfolio-app || true
+  docker run -d --name my-portfolio-app -p 80:80 my-portfolio:latest
+else
+  echo "No new updates available."
+fi
+EOSCRIPT
+
+              chmod +x /home/ec2-user/update-portfolio.sh
+              chown ec2-user:ec2-user /home/ec2-user/update-portfolio.sh
+
+              echo "Adding cron job for auto-updates..."
+              (crontab -u ec2-user -l 2>/dev/null; echo "*/2 * * * * /home/ec2-user/update-portfolio.sh") | crontab -u ec2-user -
 
               echo "=== User data script completed ==="
               EOF
