@@ -1,13 +1,9 @@
-name: Build and Push Docker Image
+name: Build and Push Docker Image (Optional)
 
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-  # Optional: run daily (remove this block if you don't want it)
+  workflow_dispatch:  # Manual trigger only
   schedule:
-    - cron: '23 20 * * *'
+    - cron: '23 20 * * *'  # Daily schedule (optional)
 
 env:
   REGISTRY: docker.io
@@ -49,24 +45,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            # pull latest image
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-
-            # stop and remove old container if exists
-            docker stop my-portfolio || true
-            docker rm my-portfolio || true
-
-            # run new container
-            docker run -d --name my-portfolio -p 80:80 ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+      - name: Docker Build Success
+        run: echo "✅ Docker image built and pushed to Docker Hub"

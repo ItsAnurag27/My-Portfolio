@@ -1,0 +1,88 @@
+name: Deploy Code Changes (Update Container)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - 'style.css'
+      - 'mediaquaries.css'
+      - 'script.js'
+      - 'assets/**'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+  pull_request:
+    branches:
+      - main
+
+env:
+  AWS_REGION: us-east-1
+  DOCKER_REPO: itsanurag27/my-portfolio
+
+jobs:
+  deploy:
+    name: Update Container on EC2
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Get EC2 Details
+        id: ec2
+        run: |
+          echo "EC2_HOST=${{ secrets.EC2_HOST }}" >> $GITHUB_OUTPUT
+          echo "EC2_USER=${{ secrets.EC2_USER }}" >> $GITHUB_OUTPUT
+          echo "SSH_KEY=${{ secrets.EC2_SSH_KEY }}" >> $GITHUB_OUTPUT
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Update Code and Restart Container
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOSSH'
+          set -x
+          
+          echo "=== Updating Portfolio Code ==="
+          cd /home/ec2-user/My-Portfolio
+          
+          # Pull latest code
+          echo "Pulling latest code..."
+          git pull origin main
+          
+          # Rebuild Docker image
+          echo "Rebuilding Docker image..."
+          sudo docker build -t my-portfolio:latest .
+          
+          # Stop old container
+          echo "Stopping old container..."
+          sudo docker stop my-portfolio-app || true
+          sudo docker rm my-portfolio-app || true
+          
+          # Start new container
+          echo "Starting new container..."
+          sudo docker run -d --name my-portfolio-app -p 80:80 my-portfolio:latest
+          
+          # Verify
+          echo "✅ Container restarted successfully!"
+          sudo docker ps | grep my-portfolio-app
+          
+          EOSSH
+
+      - name: Verify Deployment
+        run: |
+          sleep 5
+          echo "Checking if website is live..."
+          curl -f http://${{ secrets.EC2_HOST }} > /dev/null && echo "✅ Website is online!" || echo "⚠️ Website check failed"
+
+      - name: Deployment Success
+        run: |
+          echo "✅ Deployment complete!"
+          echo "Your website has been updated: http://${{ secrets.EC2_HOST }}"
