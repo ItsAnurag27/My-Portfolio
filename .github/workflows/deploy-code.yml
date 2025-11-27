@@ -1,4 +1,4 @@
-name: Deploy Code Changes (Update Container)
+name: Deploy Code Changes (Restart Container)
 
 on:
   push:
@@ -10,19 +10,16 @@ on:
       - 'mediaquaries.css'
       - 'script.js'
       - 'assets/**'
-      - 'Dockerfile'
-      - 'docker-compose.yml'
   pull_request:
     branches:
       - main
 
 env:
   AWS_REGION: us-east-1
-  DOCKER_REPO: itsanurag27/my-portfolio
 
 jobs:
   deploy:
-    name: Update Container on EC2
+    name: Update Code and Restart Container
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -30,13 +27,6 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Get EC2 Details
-        id: ec2
-        run: |
-          echo "EC2_HOST=${{ secrets.EC2_HOST }}" >> $GITHUB_OUTPUT
-          echo "EC2_USER=${{ secrets.EC2_USER }}" >> $GITHUB_OUTPUT
-          echo "SSH_KEY=${{ secrets.EC2_SSH_KEY }}" >> $GITHUB_OUTPUT
 
       - name: Setup SSH
         run: |
@@ -57,32 +47,22 @@ jobs:
           echo "Pulling latest code..."
           git pull origin main
           
-          # Rebuild Docker image
-          echo "Rebuilding Docker image..."
-          sudo docker build -t my-portfolio:latest .
-          
-          # Stop old container
-          echo "Stopping old container..."
-          sudo docker stop my-portfolio-app || true
-          sudo docker rm my-portfolio-app || true
-          
-          # Start new container
-          echo "Starting new container..."
-          sudo docker run -d --name my-portfolio-app -p 80:80 my-portfolio:latest
+          # Copy updated files into running container
+          echo "Updating files in container..."
+          sudo docker cp . my-portfolio-app:/usr/share/nginx/html/
           
           # Verify
-          echo "✅ Container restarted successfully!"
-          sudo docker ps | grep my-portfolio-app
+          echo "✅ Code updated successfully!"
           
           EOSSH
 
       - name: Verify Deployment
         run: |
-          sleep 5
-          echo "Checking if website is live..."
+          sleep 3
+          echo "Checking if website is updated..."
           curl -f http://${{ secrets.EC2_HOST }} > /dev/null && echo "✅ Website is online!" || echo "⚠️ Website check failed"
 
       - name: Deployment Success
         run: |
-          echo "✅ Deployment complete!"
+          echo "✅ Code deployment complete!"
           echo "Your website has been updated: http://${{ secrets.EC2_HOST }}"
